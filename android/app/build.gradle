@@ -1,0 +1,47 @@
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    namespace "com.kumbhsuraksha.app"
+    compileSdkVersion flutter.compileSdkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    defaultConfig {
+        applicationId "com.kumbhsuraksha.app"
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+        }
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib"
+    implementation "androidx.annotation:annotation:1.8.0"
+    debugImplementation "io.flutter:flutter_embedding_debug:1.0.0-b5990e5ccc5e325fd24f0746e7d6689bbebc7c65"
+    profileImplementation "io.flutter:flutter_embedding_profile:1.0.0-b5990e5ccc5e325fd24f0746e7d6689bbebc7c65"
+    releaseImplementation "io.flutter:flutter_embedding_release:1.0.0-b5990e5ccc5e325fd24f0746e7d6689bbebc7c65"
+    implementation project(":path_provider_android")
+    implementation project(":url_launcher_android")
+}
+
+flutter {
+    source '../..'
+}

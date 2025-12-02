@@ -1,0 +1,33 @@
+name: kumbh_suraksha
+description: A Flutter app for Kumbh Mela safety and crowd management
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Map packages
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+  
+  # UI packages
+  google_fonts: ^6.1.0
+  
+  # Icons
+  lucide_icons: ^0.257.0
+  
+  # Utilities
+  url_launcher: ^6.2.2
+  path_provider: ^2.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
