@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme.dart';
+import '../api_client.dart';
 
 class AuthScreen extends StatefulWidget {
-  final VoidCallback onLogin;
+  final void Function({
+    required String accessToken,
+    required String email,
+    required String fullName,
+  }) onLogin;
 
   const AuthScreen({Key? key, required this.onLogin}) : super(key: key);
 
@@ -20,16 +25,56 @@ class _AuthScreenState extends State<AuthScreen> {
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
 
-  void _handleSubmit() {
+  final _api = ApiClient();
+
+  Future<void> _handleSubmit() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final fullName = _nameController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || (!_isLogin && fullName.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all required fields')),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
     
-    // Simulate API call
-    Future.delayed(const Duration(milliseconds: 800), () {
+    try {
+      late Map<String, dynamic> data;
+      if (_isLogin) {
+        data = await _api.login(email: email, password: password);
+      } else {
+        data = await _api.register(
+          email: email,
+          fullName: fullName,
+          password: password,
+        );
+      }
+
+      final tokens = data['tokens'] as Map<String, dynamic>?;
+      final user = data['user'] as Map<String, dynamic>?;
+      final accessToken = tokens?['access'] as String?;
+
+      if (accessToken == null || user == null) {
+        throw Exception('Invalid response from server');
+      }
+
+      widget.onLogin(
+        accessToken: accessToken,
+        email: user['email']?.toString() ?? email,
+        fullName: user['full_name']?.toString() ?? fullName,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
       if (mounted) {
         setState(() => _loading = false);
-        widget.onLogin();
       }
-    });
+    }
   }
 
   @override

@@ -38,6 +38,7 @@ class BottomNavBar extends StatelessWidget {
         ],
       ),
       child: SafeArea(
+        top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(

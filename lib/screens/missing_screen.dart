@@ -1,59 +1,226 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../constants.dart';
 import '../theme.dart';
+import '../api_client.dart';
 
 class MissingScreen extends StatefulWidget {
-  const MissingScreen({Key? key}) : super(key: key);
+  final String? userEmail;
+  final String? accessToken;
+
+  const MissingScreen({
+    Key? key,
+    this.userEmail,
+    this.accessToken,
+  }) : super(key: key);
 
   @override
   State<MissingScreen> createState() => _MissingScreenState();
 }
 
 class _MissingScreenState extends State<MissingScreen> {
+  final _api = ApiClient();
   String _activeTab = 'lost';
   bool _showReportModal = false;
-  List<MissingPersonReport> _reports = List.from(MOCK_MISSING);
+  List<Map<String, dynamic>> _reports = [];
+  bool _isLoading = true;
   bool _isSubmitting = false;
+  String? _error;
+  final _searchController = TextEditingController();
 
   final _nameController = TextEditingController();
   final _ageController = TextEditingController();
   final _locationController = TextEditingController();
   final _descriptionController = TextEditingController();
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
 
-  void _handleReportSubmit() {
-    setState(() => _isSubmitting = true);
+  @override
+  void initState() {
+    super.initState();
+    _loadReports();
+  }
 
-    Future.delayed(const Duration(seconds: 1), () {
-      final newReport = MissingPersonReport(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: _nameController.text,
-        age: int.tryParse(_ageController.text) ?? 0,
-        lastSeenLocation: _locationController.text,
-        lastSeenTime: 'Just now',
-        description: _descriptionController.text,
-        status: _activeTab == 'lost' ? ReportStatus.missing : ReportStatus.found,
-        imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=${_nameController.text}',
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _nameController.dispose();
+    _ageController.dispose();
+    _locationController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
       );
 
-      setState(() {
-        _reports.insert(0, newReport);
-        _isSubmitting = false;
-        _showReportModal = false;
-        _nameController.clear();
-        _ageController.clear();
-        _locationController.clear();
-        _descriptionController.clear();
-      });
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadReports() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final result = await _api.getLostFoundReports(
+        type: _activeTab,
+        status: 'open',
+        search: _searchController.text.isEmpty ? null : _searchController.text,
+      );
+
+      if (mounted) {
+        setState(() {
+          _reports = (result['results'] as List<dynamic>?)
+                  ?.map((e) => e as Map<String, dynamic>)
+                  .toList() ??
+              [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Error loading reports: ${e.toString()}';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleReportSubmit() async {
+    print('DEBUG: Submitting report');
+    print('DEBUG: widget.userEmail = ${widget.userEmail}');
+    print('DEBUG: widget.accessToken = ${widget.accessToken != null ? "present" : "null"}');
+    
+    if (widget.userEmail == null || widget.userEmail!.isEmpty) {
+      print('DEBUG: User email is null or empty');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please login to submit a report'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    
+    print('DEBUG: User email is valid: ${widget.userEmail}');
+
+    if (_nameController.text.isEmpty || _descriptionController.text.isEmpty || _locationController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all required fields'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      // Get current location if available
+      double? latitude;
+      double? longitude;
+
+      try {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (serviceEnabled) {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+
+          if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+            final position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.medium,
+            );
+            latitude = position.latitude;
+            longitude = position.longitude;
+          }
+        }
+      } catch (e) {
+        print('Error getting location: $e');
+        // Continue without location
+      }
+
+      await _api.createLostFoundReport(
+        reportType: _activeTab,
+        userEmail: widget.userEmail!,
+        personName: _nameController.text,
+        description: _descriptionController.text,
+        location: _locationController.text,
+        age: _ageController.text.isEmpty ? null : int.tryParse(_ageController.text),
+        latitude: latitude,
+        longitude: longitude,
+        accessToken: widget.accessToken,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _showReportModal = false;
+          _nameController.clear();
+          _ageController.clear();
+          _locationController.clear();
+          _descriptionController.clear();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Report submitted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Reload reports
+        _loadReports();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error submitting report: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Filter reports by active tab (already filtered by API, but double-check)
     final filteredReports = _reports.where((r) {
-      return _activeTab == 'lost'
-          ? r.status == ReportStatus.missing
-          : r.status == ReportStatus.found;
+      final reportType = r['report_type'] as String? ?? '';
+      return reportType == _activeTab;
     }).toList();
 
     return Scaffold(
@@ -115,6 +282,7 @@ class _MissingScreenState extends State<MissingScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
+                          controller: _searchController,
                           decoration: InputDecoration(
                             hintText: 'Search by name, description, or location...',
                             hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -125,7 +293,12 @@ class _MissingScreenState extends State<MissingScreen> {
                             contentPadding: EdgeInsets.zero,
                           ),
                           style: Theme.of(context).textTheme.bodyMedium,
+                          onSubmitted: (_) => _loadReports(),
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(LucideIcons.search, size: 18, color: AppTheme.primaryOrange),
+                        onPressed: _loadReports,
                       ),
                     ],
                   ),
@@ -196,7 +369,10 @@ class _MissingScreenState extends State<MissingScreen> {
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => setState(() => _activeTab = 'lost'),
+                        onTap: () {
+                          setState(() => _activeTab = 'lost');
+                          _loadReports();
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
@@ -210,7 +386,7 @@ class _MissingScreenState extends State<MissingScreen> {
                             ),
                           ),
                           child: Text(
-                            'Lost (${_reports.where((r) => r.status == ReportStatus.missing).length})',
+                            'Lost (${_reports.where((r) => (r['report_type'] as String? ?? '') == 'lost').length})',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               color: _activeTab == 'lost'
@@ -223,7 +399,10 @@ class _MissingScreenState extends State<MissingScreen> {
                     ),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => setState(() => _activeTab = 'found'),
+                        onTap: () {
+                          setState(() => _activeTab = 'found');
+                          _loadReports();
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
@@ -237,7 +416,7 @@ class _MissingScreenState extends State<MissingScreen> {
                             ),
                           ),
                           child: Text(
-                            'Found (${_reports.where((r) => r.status == ReportStatus.found).length})',
+                            'Found (${_reports.where((r) => (r['report_type'] as String? ?? '') == 'found').length})',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               color: _activeTab == 'found'
@@ -254,13 +433,54 @@ class _MissingScreenState extends State<MissingScreen> {
 
               // List
               Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filteredReports.length,
-                  itemBuilder: (context, index) {
-                    return _buildReportCard(context, filteredReports[index]);
-                  },
-                ),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(LucideIcons.alertCircle, size: 48, color: Colors.red),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _error!,
+                                  style: const TextStyle(color: Colors.red),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _loadReports,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : filteredReports.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(LucideIcons.search, size: 48, color: AppTheme.textLight),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No ${_activeTab == 'lost' ? 'lost' : 'found'} reports yet',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        color: AppTheme.textMedium,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : RefreshIndicator(
+                                onRefresh: _loadReports,
+                                child: ListView.builder(
+                                  padding: const EdgeInsets.all(16),
+                                  itemCount: filteredReports.length,
+                                  itemBuilder: (context, index) {
+                                    return _buildReportCard(context, filteredReports[index]);
+                                  },
+                                ),
+                              ),
               ),
             ],
           ),
@@ -272,10 +492,36 @@ class _MissingScreenState extends State<MissingScreen> {
     );
   }
 
-  Widget _buildReportCard(BuildContext context, MissingPersonReport item) {
-    final isLost = item.status == ReportStatus.missing;
+  Widget _buildReportCard(BuildContext context, Map<String, dynamic> item) {
+    final reportType = item['report_type'] as String? ?? '';
+    final isLost = reportType == 'lost';
     final statusColor = isLost ? AppTheme.rose : AppTheme.primaryOrange;
     final bgColor = isLost ? AppTheme.rose.withOpacity(0.1) : AppTheme.primaryOrange.withOpacity(0.1);
+    
+    final personName = item['person_name'] as String? ?? 'Unknown';
+    final age = item['age'] as int?;
+    final description = item['description'] as String? ?? '';
+    final location = item['location'] as String? ?? '';
+    final createdAt = item['created_at'] as String?;
+    final userPhone = item['user_phone'] as String?;
+    final userEmail = item['user_email'] as String?;
+    
+    String formatDate(String? dateStr) {
+      if (dateStr == null || dateStr.isEmpty) return 'Unknown';
+      try {
+        final date = DateTime.parse(dateStr);
+        final now = DateTime.now();
+        final difference = now.difference(date);
+        
+        if (difference.inMinutes < 1) return 'Just now';
+        if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+        if (difference.inHours < 24) return '${difference.inHours}h ago';
+        if (difference.inDays < 7) return '${difference.inDays}d ago';
+        return '${date.day}/${date.month}/${date.year}';
+      } catch (e) {
+        return 'Unknown';
+      }
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -305,7 +551,7 @@ class _MissingScreenState extends State<MissingScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            item.name,
+                            personName,
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                         ),
@@ -327,14 +573,16 @@ class _MissingScreenState extends State<MissingScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Age: ${item.age}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                    if (age != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Age: $age',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
-                      item.description,
+                      description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -359,7 +607,7 @@ class _MissingScreenState extends State<MissingScreen> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    item.lastSeenLocation,
+                    location,
                     style: Theme.of(context).textTheme.bodySmall,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -368,7 +616,7 @@ class _MissingScreenState extends State<MissingScreen> {
                 const Icon(LucideIcons.clock, size: 14, color: AppTheme.textLight),
                 const SizedBox(width: 6),
                 Text(
-                  item.lastSeenTime,
+                  formatDate(createdAt),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -379,7 +627,48 @@ class _MissingScreenState extends State<MissingScreen> {
             width: double.infinity,
             height: 40,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                // Show contact information
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Contact Reporter'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (userEmail != null) ...[
+                          Row(
+                            children: [
+                              const Icon(LucideIcons.mail, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(userEmail!)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        if (userPhone != null) ...[
+                          Row(
+                            children: [
+                              const Icon(LucideIcons.phone, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(userPhone!)),
+                            ],
+                          ),
+                        ],
+                        if (userEmail == null && userPhone == null)
+                          const Text('No contact information available'),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryOrange.withOpacity(0.9),
                 foregroundColor: Colors.white,
@@ -430,7 +719,16 @@ class _MissingScreenState extends State<MissingScreen> {
                     IconButton(
                       icon: const Icon(LucideIcons.x, size: 20),
                       color: AppTheme.textLight,
-                      onPressed: () => setState(() => _showReportModal = false),
+                      onPressed: () {
+                        setState(() {
+                          _showReportModal = false;
+                          _selectedImage = null;
+                          _nameController.clear();
+                          _ageController.clear();
+                          _locationController.clear();
+                          _descriptionController.clear();
+                        });
+                      },
                     ),
                   ],
                 ),
@@ -449,9 +747,9 @@ class _MissingScreenState extends State<MissingScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Photo Upload Placeholder
+                      // Photo Upload
                       GestureDetector(
-                        onTap: () {},
+                        onTap: _pickImage,
                         child: Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
@@ -462,37 +760,57 @@ class _MissingScreenState extends State<MissingScreen> {
                             ),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Column(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.emerald.withOpacity(0.1),
-                                  shape: BoxShape.circle,
+                          child: _selectedImage != null
+                              ? Column(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(
+                                        _selectedImage!,
+                                        height: 150,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextButton.icon(
+                                      onPressed: _pickImage,
+                                      icon: const Icon(LucideIcons.refreshCw, size: 16),
+                                      label: const Text('Change Photo'),
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.emerald.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        LucideIcons.upload,
+                                        color: AppTheme.emerald,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Tap to upload photo',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.textMedium,
+                                      ),
+                                    ),
+                                    Text(
+                                      'JPG, PNG up to 5MB',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        fontSize: 9,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: const Icon(
-                                  LucideIcons.upload,
-                                  color: AppTheme.emerald,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Tap to upload photo',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textMedium,
-                                ),
-                              ),
-                              Text(
-                                'JPG, PNG up to 5MB',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontSize: 9,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                       ),
 
@@ -637,12 +955,4 @@ class _MissingScreenState extends State<MissingScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _ageController.dispose();
-    _locationController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
 }

@@ -1,361 +1,407 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme.dart';
+import '../api_client.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   final VoidCallback onLogout;
+  final String? accessToken;
+  final String? email;
+  final String? fullName;
 
-  const ProfileScreen({Key? key, required this.onLogout}) : super(key: key);
+  const ProfileScreen({
+    Key? key,
+    required this.onLogout,
+    this.accessToken,
+    this.email,
+    this.fullName,
+  }) : super(key: key);
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _api = ApiClient();
+  String? _email;
+  String? _fullName;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _email = widget.email;
+    _fullName = widget.fullName;
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final token = widget.accessToken;
+    if (token == null) return;
+    setState(() => _loading = true);
+    try {
+      final data = await _api.getProfile(accessToken: token);
+      setState(() {
+        _email = data['email']?.toString() ?? _email;
+        _fullName = data['full_name']?.toString() ?? _fullName;
+      });
+    } catch (_) {
+      // Ignore errors here; UI will still show existing data.
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundGray,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Orange Header Card
-            Container(
-              color: AppTheme.primaryOrange.withOpacity(0.05),
-              padding: const EdgeInsets.all(16),
-              child: SafeArea(
-                bottom: false,
-                child: Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryOrange.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primaryOrange.withOpacity(0.2),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            // Header with gradient background
+            SliverToBoxAdapter(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppTheme.primaryOrange,
+                      AppTheme.primaryOrange.withOpacity(0.8),
                     ],
                   ),
-                  child: Stack(
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
                     children: [
-                      Column(
+                      const SizedBox(height: 16),
+                      // Avatar
+                      Stack(
                         children: [
-                          // Avatar
                           Container(
-                            width: 80,
-                            height: 80,
+                            width: 100,
+                            height: 100,
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryOrange.withOpacity(0.9),
+                              color: Colors.white,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 4),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 4,
+                              ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 10,
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
                                 ),
                               ],
                             ),
-                            child: const Center(
-                              child: Text(
-                                'B',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
+                            child: _loading
+                                ? const Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppTheme.primaryOrange,
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      (_fullName?.isNotEmpty == true
+                                              ? _fullName!.characters.first.toUpperCase()
+                                              : 'U'),
+                                      style: const TextStyle(
+                                        color: AppTheme.primaryOrange,
+                                        fontSize: 40,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppTheme.primaryOrange,
+                                  width: 2,
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'badgujaraditya6060',
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'badgujaraditya6060@gmail.com',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.textDark.withOpacity(0.8),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.emerald,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.emerald.withOpacity(0.3),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(LucideIcons.checkCircle, size: 10, color: Colors.white),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Verified Account',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          ElevatedButton(
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: AppTheme.textDark,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              child: const Icon(
+                                LucideIcons.camera,
+                                size: 16,
+                                color: AppTheme.primaryOrange,
                               ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(LucideIcons.edit2, size: 12),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Edit Profile',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
                         ],
                       ),
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            LucideIcons.edit2,
-                            size: 14,
-                            color: Colors.white,
-                          ),
+                      const SizedBox(height: 20),
+                      // Name
+                      Text(
+                        _fullName ?? 'User',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      // Email
+                      if (_email != null)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              LucideIcons.mail,
+                              size: 16,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _email!,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      const SizedBox(height: 16),
+                      // Verified Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              LucideIcons.checkCircle,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'Verified Account',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
               ),
             ),
 
-            // Stats Grid
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(context, '3', 'Family Members', AppTheme.primaryOrange),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(context, '12', 'Days Active', AppTheme.textDark),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(context, '5', 'Safety Reports', AppTheme.emerald),
-                  ),
-                ],
-              ),
-            ),
-
-            // Account Information
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 16),
-                    child: Text(
-                      'Account Information',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  Container(
-                    decoration: AppTheme.cardDecoration(),
-                    child: Column(
+            // Content Section
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Account Details Card
+                    _buildSectionCard(
+                      context,
+                      title: 'Account Details',
                       children: [
-                        _buildInfoTile(
+                        _buildDetailRow(
                           context,
-                          LucideIcons.user,
-                          'Full Name',
-                          'badgujaraditya6060',
-                          AppTheme.primaryOrange.withOpacity(0.1),
-                          AppTheme.primaryOrange,
+                          icon: LucideIcons.user,
+                          label: 'Full Name',
+                          value: _fullName ?? 'Not set',
+                          iconColor: AppTheme.primaryOrange,
                         ),
-                        const Divider(height: 1, color: Color(0xFFF8FAFC)),
-                        _buildInfoTile(
+                        const Divider(height: 1),
+                        if (_email != null)
+                          _buildDetailRow(
+                            context,
+                            icon: LucideIcons.mail,
+                            label: 'Email',
+                            value: _email!,
+                            iconColor: AppTheme.emerald,
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Quick Actions Card
+                    _buildSectionCard(
+                      context,
+                      title: 'Settings',
+                      children: [
+                        _buildActionRow(
                           context,
-                          LucideIcons.mail,
-                          'Email Address',
-                          'badgujaraditya6060@gmail.com',
-                          AppTheme.emerald.withOpacity(0.1),
-                          AppTheme.emerald,
+                          icon: LucideIcons.bell,
+                          title: 'Notifications',
+                          subtitle: 'Manage notification preferences',
+                          iconColor: AppTheme.primaryOrange,
+                          onTap: () {},
                         ),
-                        const Divider(height: 1, color: Color(0xFFF8FAFC)),
-                        _buildInfoTile(
+                        const Divider(height: 1),
+                        _buildActionRow(
                           context,
-                          LucideIcons.phone,
-                          'Phone Number',
-                          '+91 9876543210',
-                          const Color(0xFFF8FAFC),
-                          AppTheme.textMedium,
+                          icon: LucideIcons.shield,
+                          title: 'Privacy & Security',
+                          subtitle: 'Manage your privacy settings',
+                          iconColor: AppTheme.emerald,
+                          onTap: () {},
+                        ),
+                        const Divider(height: 1),
+                        _buildActionRow(
+                          context,
+                          icon: LucideIcons.helpCircle,
+                          title: 'Help & Support',
+                          subtitle: 'Get help and contact support',
+                          iconColor: AppTheme.textMedium,
+                          onTap: () {},
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 24),
+                    const SizedBox(height: 16),
 
-            // Quick Actions
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 16),
-                    child: Text(
-                      'Quick Actions',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  Container(
-                    decoration: AppTheme.cardDecoration(),
-                    child: Column(
-                      children: [
-                        _buildActionTile(
-                          context,
-                          LucideIcons.bell,
-                          'Notifications',
-                          AppTheme.textLight,
-                          () {},
-                        ),
-                        const Divider(height: 1, color: Color(0xFFF8FAFC)),
-                        _buildActionTile(
-                          context,
-                          LucideIcons.shield,
-                          'Security',
-                          AppTheme.textLight,
-                          () {},
-                        ),
-                        const Divider(height: 1, color: Color(0xFFF8FAFC)),
-                        _buildActionTile(
-                          context,
+                    // Logout Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          _showLogoutDialog(context);
+                        },
+                        icon: const Icon(
                           LucideIcons.logOut,
-                          'Logout',
-                          AppTheme.rose,
-                          onLogout,
-                          isDestructive: true,
+                          size: 18,
                         ),
-                      ],
+                        label: const Text(
+                          'Logout',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.rose,
+                          side: BorderSide(color: AppTheme.rose, width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
-
-            const SizedBox(height: 100),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String value, String label, Color color) {
+  Widget _buildSectionCard(
+    BuildContext context, {
+    required String title,
+    required List<Widget> children,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.cardDecoration(),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            value,
-            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-              color: color,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          ...children,
         ],
       ),
     );
   }
 
-  Widget _buildInfoTile(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value,
-    Color bgColor,
-    Color iconColor,
-  ) {
+  Widget _buildDetailRow(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color iconColor,
+  }) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: bgColor,
-              shape: BoxShape.circle,
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 16, color: iconColor),
+            child: Icon(icon, size: 20, color: iconColor),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label.toUpperCase(),
+                  label,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w500,
-                  ),
+                        color: AppTheme.textMedium,
+                        fontSize: 12,
+                      ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   value,
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ],
-            ),
-          ),
-          TextButton(
-            onPressed: () {},
-            child: Text(
-              'Edit',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.primaryOrange,
-              ),
             ),
           ),
         ],
@@ -363,34 +409,99 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActionTile(
-    BuildContext context,
-    IconData icon,
-    String label,
-    Color iconColor,
-    VoidCallback onTap, {
-    bool isDestructive = false,
+  Widget _buildActionRow(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color iconColor,
+    required VoidCallback onTap,
   }) {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: iconColor),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: isDestructive ? AppTheme.rose : AppTheme.textMedium,
-                  fontWeight: isDestructive ? FontWeight.bold : FontWeight.w500,
-                ),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
               ),
+              child: Icon(icon, size: 20, color: iconColor),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textMedium,
+                          fontSize: 12,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              LucideIcons.chevronRight,
+              size: 20,
+              color: AppTheme.textLight,
             ),
           ],
         ),
       ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Logout',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: AppTheme.textMedium),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onLogout();
+              },
+              child: Text(
+                'Logout',
+                style: TextStyle(
+                  color: AppTheme.rose,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

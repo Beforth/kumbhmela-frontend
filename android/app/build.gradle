@@ -38,8 +38,14 @@ dependencies {
     debugImplementation "io.flutter:flutter_embedding_debug:1.0.0-b5990e5ccc5e325fd24f0746e7d6689bbebc7c65"
     profileImplementation "io.flutter:flutter_embedding_profile:1.0.0-b5990e5ccc5e325fd24f0746e7d6689bbebc7c65"
     releaseImplementation "io.flutter:flutter_embedding_release:1.0.0-b5990e5ccc5e325fd24f0746e7d6689bbebc7c65"
-    implementation project(":path_provider_android")
-    implementation project(":url_launcher_android")
+    
+    // Flutter plugins - manually included since Flutter Gradle plugin isn't auto-including them
+    implementation project(':flutter_plugin_android_lifecycle')
+    implementation project(':geolocator_android')
+    implementation project(':image_picker_android')
+    implementation project(':path_provider_android')
+    implementation project(':shared_preferences_android')
+    implementation project(':url_launcher_android')
 }
 
 flutter {
