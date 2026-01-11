@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import 'dart:async';
 import '../theme.dart';
 import '../api_client.dart';
@@ -929,8 +930,22 @@ class _FamilyScreenState extends State<FamilyScreen> {
                   final invitationLink = result['invitation_link'] as String?;
                   
                   if (invitationLink != null) {
-                    // Show link in a dialog with copy option
-                    _showInvitationLinkDialog(context, invitationLink);
+                    // Directly open share sheet
+                    try {
+                      await Share.share(
+                        'Join my family on Kumbh Suraksha!\n\n$invitationLink\n\nClick the link to accept the invitation.',
+                        subject: 'Family Invitation - Kumbh Suraksha',
+                      );
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error sharing link: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
                     // Refresh family members list
                     _loadFamilyMembers();
                   }
@@ -1015,7 +1030,35 @@ class _FamilyScreenState extends State<FamilyScreen> {
               }
             },
             icon: const Icon(LucideIcons.copy, size: 16),
-            label: const Text('Copy Link'),
+            label: const Text('Copy'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey[300],
+              foregroundColor: Colors.black87,
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              try {
+                await Share.share(
+                  'Join my family on Kumbh Suraksha!\n\n$link\n\nClick the link to accept the invitation.',
+                  subject: 'Family Invitation - Kumbh Suraksha',
+                );
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error sharing link: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(LucideIcons.share2, size: 16),
+            label: const Text('Share'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryOrange,
               foregroundColor: Colors.white,

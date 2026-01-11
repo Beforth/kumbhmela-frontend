@@ -56,3 +56,6 @@ project(':shared_preferences_android').projectDir = new File("${System.getProper
 
 include ':url_launcher_android'
 project(':url_launcher_android').projectDir = new File("${System.getProperty('user.home')}/.pub-cache/hosted/pub.dev/url_launcher_android-6.3.20/android")
+
+include ':share_plus'
+project(':share_plus').projectDir = new File("${System.getProperty('user.home')}/.pub-cache/hosted/pub.dev/share_plus-10.1.4/android")

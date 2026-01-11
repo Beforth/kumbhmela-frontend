@@ -46,6 +46,7 @@ dependencies {
     implementation project(':path_provider_android')
     implementation project(':shared_preferences_android')
     implementation project(':url_launcher_android')
+    implementation project(':share_plus')
 }
 
 flutter {

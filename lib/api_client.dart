@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 /// Simple API client for talking to the Django backend.
 class ApiClient {
   /// Change this if your backend runs on a different host/port.
-  static const String baseUrl = 'https://apikumbh.pythonanywhere.com';
-  // static const String baseUrl = 'http://192.168.1.15:8000';
+  // static const String baseUrl = 'https://apikumbh.pythonanywhere.com';
+  static const String baseUrl = 'http://192.168.1.15:8000';
 
   final http.Client _client;
 
@@ -508,10 +508,73 @@ class ApiClient {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return;
     }
-    final message = data is Map && data['detail'] != null
-        ? data['detail'].toString()
-        : 'Request failed with status ${response.statusCode}';
+    
+    // Extract user-friendly error message from Django REST Framework response
+    String message = _extractErrorMessage(data, response.statusCode);
     throw Exception(message);
+  }
+
+  String _extractErrorMessage(dynamic data, int statusCode) {
+    if (data == null) {
+      return 'Request failed with status $statusCode';
+    }
+
+    if (data is! Map) {
+      return data.toString();
+    }
+
+    // Check for 'detail' field (common in DRF)
+    if (data['detail'] != null) {
+      final detail = data['detail'];
+      if (detail is List && detail.isNotEmpty) {
+        return detail.join(', ');
+      }
+      return detail.toString();
+    }
+
+    // Check for 'non_field_errors' (DRF validation errors)
+    if (data['non_field_errors'] != null) {
+      final errors = data['non_field_errors'];
+      if (errors is List && errors.isNotEmpty) {
+        return errors.join(', ');
+      }
+      return errors.toString();
+    }
+
+    // Check for field-specific errors (e.g., {'email': ['This field is required.']})
+    final fieldErrors = <String>[];
+    data.forEach((key, value) {
+      if (value != null) {
+        if (value is List) {
+          for (var error in value) {
+            fieldErrors.add('${_capitalizeFirst(key)}: $error');
+          }
+        } else {
+          fieldErrors.add('${_capitalizeFirst(key)}: $value');
+        }
+      }
+    });
+
+    if (fieldErrors.isNotEmpty) {
+      return fieldErrors.join('\n');
+    }
+
+    // Fallback: try to extract any error message
+    if (data['error'] != null) {
+      return data['error'].toString();
+    }
+
+    if (data['message'] != null) {
+      return data['message'].toString();
+    }
+
+    // Last resort
+    return 'Request failed with status $statusCode';
+  }
+
+  String _capitalizeFirst(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1).replaceAll('_', ' ');
   }
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme.dart';
 import '../constants.dart';
 
@@ -139,7 +140,7 @@ class HomeScreen extends StatelessWidget {
                         'Police',
                         '100',
                         AppTheme.rose,
-                        () {},
+                        () => _dialNumber('100', context),
                       ),
                       const Divider(height: 24),
                       _buildEmergencyContact(
@@ -147,7 +148,7 @@ class HomeScreen extends StatelessWidget {
                         'Medical Emergency',
                         '108',
                         AppTheme.emerald,
-                        () {},
+                        () => _dialNumber('108', context),
                       ),
                       const Divider(height: 24),
                       _buildEmergencyContact(
@@ -155,7 +156,7 @@ class HomeScreen extends StatelessWidget {
                         'Fire Department',
                         '101',
                         AppTheme.primaryOrange,
-                        () {},
+                        () => _dialNumber('101', context),
                       ),
                     ],
                   ),
@@ -543,5 +544,42 @@ class HomeScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// Opens the phone dialer with the given number
+  static Future<void> _dialNumber(String phoneNumber, BuildContext context) async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      // Try to launch the dialer directly
+      final launched = await launchUrl(
+        phoneUri,
+        mode: LaunchMode.externalApplication,
+      );
+      
+      if (!launched) {
+        // If launch failed, show error message
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open dialer. Please dial $phoneNumber manually.'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error launching dialer: $e');
+      // Show user-friendly error message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening dialer: $phoneNumber'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme.dart';
 import '../api_client.dart';
+import '../utils/error_helper.dart';
 
 class AuthScreen extends StatefulWidget {
   final void Function({
@@ -67,9 +68,7 @@ class _AuthScreenState extends State<AuthScreen> {
         fullName: user['full_name']?.toString() ?? fullName,
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ErrorHelper.showError(context, e);
     } finally {
       if (mounted) {
         setState(() => _loading = false);
